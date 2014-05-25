@@ -1,0 +1,4 @@
+.cabal-sandbox
+.vagrant
+cabal.sandbox.config
+dist
