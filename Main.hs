@@ -10,38 +10,38 @@ import Network.AMQP
 import Options.Applicative
 import System.FilePath
 import System.INotify
+import Data.Configurator
 import qualified Data.ByteString.Lazy.Char8 as BL
 
-data PathWatcher = PathWatcher
-    { host :: String
-    , user :: Text
-    , pass :: Text
+data MainOpts = MainOpts
+    { conf :: FilePath
     , queue :: Text
-    , listenPath :: FilePath
     }
 
-pathWatcher :: Parser PathWatcher
-pathWatcher = PathWatcher
-              <$> strOption (short 'h' <> metavar "HOST" <> help "AMQP host")
-              <*> fmap pack (strOption $ short 'u' <> metavar "USER" <> help "AMQP username")
-              <*> fmap pack (strOption $ short 'p' <> metavar "PASS" <> help "AMQP password")
-              <*> fmap pack (strOption $ short 'q' <> metavar "QUEUE" <> help "AMQP queue name")
-              <*> argument str (metavar "DIRECTORY" <> help "Path to listen for close_write events")
+mainOpts :: Parser MainOpts
+mainOpts = MainOpts
+           <$> (strOption $ short 'c' <> metavar "CONFIG" <> help "Configuration file")
+           <*> fmap pack (argument str $ metavar "QUEUE" <> help "AMQP queue name")
 
 longHelp :: Parser (a -> a)
 longHelp = abortOption ShowHelpText (long "help" <> hidden)
 
-opts :: ParserInfo PathWatcher
-opts = info (longHelp <*> pathWatcher) $ fullDesc <> progDesc "Dump close_write inotify events onto an AMQP queue."
+opts :: ParserInfo MainOpts
+opts = info (longHelp <*> mainOpts) $ fullDesc <> progDesc "Dump close_write inotify events onto an AMQP queue."
 
 main :: IO ()
 main = execParser opts >>= withINotify . notifier
 
-notifier :: PathWatcher -> INotify -> IO ()
-notifier p i = bracket acquire (uncurry release) (const block)
+notifier :: MainOpts -> INotify -> IO ()
+notifier o i = bracket acquire (uncurry release) (const block)
     where acquire = do
-            conn <- openConnection (host p) "/" (user p) (pass p)
-            w <- addWatch i [CloseWrite] (listenPath p) $ handleEvent p conn
+            p <- load [Required $ conf o]
+            listenPath <- require p "incoming.path"
+            host <- require p "amqp.connection.host"
+            user <- require p "amqp.connection.username"
+            pass <- require p "amqp.connection.password"
+            conn <- openConnection host "/" user pass
+            w <- addWatch i [CloseWrite] listenPath $ handleEvent listenPath (queue o) conn
             return (conn, w)
           release conn w = do
             removeWatch w
@@ -49,14 +49,14 @@ notifier p i = bracket acquire (uncurry release) (const block)
           -- Blocks the main thread, watchers are separate threads
           block = newEmptyMVar >>= takeMVar
 
-handleEvent :: PathWatcher -> Connection -> Event -> IO ()
-handleEvent p conn = maybe (return ()) handlePath . maybeFilePath
+handleEvent :: FilePath -> Text -> Connection -> Event -> IO ()
+handleEvent listenPath q conn = maybe (return ()) handlePath . maybeFilePath
   where handlePath :: FilePath -> IO ()
         handlePath path = do
           chan <- openChannel conn
 
-          void $ declareQueue chan newQueue { queueName = queue p }
+          void $ declareQueue chan newQueue { queueName = q }
 
-          let wholePath = listenPath p </> path
-          publishMsg chan "" (queue p) newMsg { msgBody = BL.pack wholePath
+          let wholePath = listenPath </> path
+          publishMsg chan "" q newMsg { msgBody = BL.pack wholePath
                                               , msgDeliveryMode = Just Persistent }
