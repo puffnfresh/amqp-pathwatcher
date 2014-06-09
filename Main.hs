@@ -5,12 +5,13 @@ module Main (main) where
 import Control.Concurrent.MVar (newEmptyMVar, takeMVar)
 import Control.Exception.Base (bracket)
 import Control.Monad (void)
+import Data.Configurator
 import Data.Text
 import Network.AMQP
 import Options.Applicative
+import System.Directory
 import System.FilePath
 import System.INotify
-import Data.Configurator
 import qualified Data.ByteString.Lazy.Char8 as BL
 
 data MainOpts = MainOpts
@@ -41,7 +42,11 @@ notifier o i = bracket acquire (uncurry release) (const block)
             user <- require p "amqp.connection.username"
             pass <- require p "amqp.connection.password"
             conn <- openConnection host "/" user pass
-            w <- addWatch i [CloseWrite] listenPath $ handleEvent listenPath (queue o) conn
+
+            let q = queue o
+            handleStartup listenPath conn q
+            w <- addWatch i [CloseWrite] listenPath $ handleEvent listenPath conn q
+
             return (conn, w)
           release conn w = do
             removeWatch w
@@ -49,14 +54,19 @@ notifier o i = bracket acquire (uncurry release) (const block)
           -- Blocks the main thread, watchers are separate threads
           block = newEmptyMVar >>= takeMVar
 
-handleEvent :: FilePath -> Text -> Connection -> Event -> IO ()
-handleEvent listenPath q conn = maybe (return ()) handlePath . maybeFilePath
-  where handlePath :: FilePath -> IO ()
-        handlePath path = do
-          chan <- openChannel conn
+handleStartup :: FilePath -> Connection -> Text -> IO ()
+handleStartup listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q
 
-          void $ declareQueue chan newQueue { queueName = q }
+handleEvent :: FilePath -> Connection -> Text -> Event -> IO ()
+handleEvent listenPath conn q = maybe (return ()) (publishPaths conn q . ((:[]) . (listenPath </>))) . maybeFilePath
 
-          let wholePath = listenPath </> path
-          publishMsg chan "" q newMsg { msgBody = BL.pack wholePath
-                                              , msgDeliveryMode = Just Persistent }
+publishPaths :: Connection -> Text -> [FilePath] -> IO ()
+publishPaths conn q paths = do
+  chan <- openChannel conn
+
+  void $ declareQueue chan newQueue { queueName = q }
+
+  mapM_ (publish chan) paths
+  where publish :: Channel -> FilePath -> IO ()
+        publish chan p = publishMsg chan "" q newMsg { msgBody = BL.pack p
+                                                     , msgDeliveryMode = Just Persistent }
