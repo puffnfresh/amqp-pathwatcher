@@ -1,0 +1,5 @@
+amqp-pathwatcher (0.1.0) precise; urgency=low
+
+  * Initial release.
+
+ -- brian@simpleenergy.com <brian@bs00.cornell.mgmt>  Wed, 25 Jun 2014 16:44:00 -0600

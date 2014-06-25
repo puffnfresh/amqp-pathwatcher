@@ -1,0 +1,41 @@
+description	"Data Intelligence Path Watcher"
+author		"SimpleEnergy DI team"
+
+start on runlevel [2345]
+stop on runlevel [!2345]
+
+respawn
+# Ensure that we catch immediate exits
+respawn limit 10 60
+
+umask 022
+
+# Log any *unredirected* std(err|out) to a logfile
+console log
+
+env DEFAULTS=/etc/default/amqp-pathwatcher
+
+# This pre-start ensures proper config exists before firing things off
+pre-start script
+[ -f $DEFAULTS ] || {
+  echo "Missing configuration env $DEFAULTS!"
+  stop
+  exit
+}
+
+. $DEFAULTS
+
+[ -z "$CONFIG" ] && echo "Warning: no config file set"
+[ -z "$QUEUE"  ] && echo "Warning: no queue set"
+
+
+echo "Pre-start complete"
+end script #pre-start
+
+script
+. $DEFAULTS
+
+echo "Using base dir ${BASEDIR:=/usr/local/datintel}"
+
+exec ${BASEDIR}/bin/amqp-pathwatcher -c $CONFIG $QUEUE
+end script

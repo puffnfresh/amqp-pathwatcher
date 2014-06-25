@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+
+VERSION=$(shell git describe)
+BINARY=dist/build/amqp-pathwatcher/amqp-pathwatcher
+
+build: ensure-src clean binary
+
+build-all: ensure-src clean binary
+
+ensure-src: ${BINARY}
+	@echo "Building $(VERSION) from ${BINARY} with PKGOPTS=$(PKGOPTS)"
+
+clean:
+	dh_testdir $(PKGOPTS)
+	dh_testroot $(PKGOPTS)
+	dh_clean $(PKGOPTS)
+	rm -rf debian/tmp*
+
+binary: prep
+	dh_install $(PKGOPTS) -X'~'
+	dh_installinit $(PKGOPTS)
+	dh_installchangelogs $(PKGOPTS)
+	dh_compress $(PKGOPTS)
+	dh_fixperms $(PKGOPTS)
+	dh_installdeb $(PKGOPTS)
+	dh_gencontrol $(PKGOPTS)
+	dh_md5sums $(PKGOPTS)
+	dh_builddeb $(PKGOPTS)
+
+prep:
+	dh_testdir $(PKGOPTS)
+	dh_testroot $(PKGOPTS)
+	dh_prep $(PKGOPTS)

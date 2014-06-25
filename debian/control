@@ -1,0 +1,6 @@
+Source: amqp-pathwatcher
+Maintainer: SimpleEnergy Data Intelligence Team
+
+Package: amqp-pathwatcher
+Architecture: amd64
+Description: Dump close_write inotify events onto an AMQP queue.
