@@ -37,7 +37,7 @@ notifier :: MainOpts -> INotify -> IO ()
 notifier o i = bracket acquire (uncurry release) (const block)
     where acquire = do
             p <- load [Required $ conf o]
-            listenPath <- require p "incoming.path"
+            listenPath <- require p "fileIngest.incomingPath"
             host <- require p "amqp.connection.host"
             user <- require p "amqp.connection.username"
             pass <- require p "amqp.connection.password"
