@@ -1,3 +1,12 @@
+amqp-pathwatcher (0.1.2) UNRELEASED; urgency=low
+
+  [ Brian McKenna ]
+  * Change incoming path config field
+
+  [ brian@simpleenergy.com ]
+
+ -- brian@simpleenergy.com <brian@bs00.cornell.mgmt>  Wed, 25 Jun 2014 18:00:11 -0600
+
 amqp-pathwatcher (0.1.1) UNRELEASED; urgency=low
 
   [ Brian McKenna ]
