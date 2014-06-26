@@ -6,7 +6,8 @@ import Control.Concurrent.MVar (newEmptyMVar, takeMVar)
 import Control.Exception.Base (bracket)
 import Control.Monad (void)
 import Data.Configurator
-import Data.Text
+import Data.Maybe
+import Data.Text hiding (filter)
 import Network.AMQP
 import Options.Applicative
 import System.Directory
@@ -55,7 +56,7 @@ notifier o i = bracket acquire (uncurry release) (const block)
           block = newEmptyMVar >>= takeMVar
 
 handleStartup :: FilePath -> Connection -> Text -> IO ()
-handleStartup listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q
+handleStartup listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q . filter ((/= Just '.') . listToMaybe)
 
 handleEvent :: FilePath -> Connection -> Text -> Event -> IO ()
 handleEvent listenPath conn q = maybe (return ()) (publishPaths conn q . ((:[]) . (listenPath </>))) . maybeFilePath
