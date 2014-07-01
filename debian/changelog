@@ -1,3 +1,12 @@
+amqp-pathwatcher (0.1.4) UNRELEASED; urgency=low
+
+  [ Brian McKenna ]
+  * Fix listenPath not prefixed on startup
+
+  [ brian@simpleenergy.com ]
+
+ -- brian@simpleenergy.com <brian@bs00.cornell.mgmt>  Tue, 01 Jul 2014 14:43:39 -0600
+
 amqp-pathwatcher (0.1.3) UNRELEASED; urgency=low
 
   [ Brian McKenna ]
