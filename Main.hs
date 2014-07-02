@@ -2,9 +2,9 @@
 
 module Main (main) where
 
-import Control.Concurrent.MVar (newEmptyMVar, takeMVar)
+import Control.Concurrent (threadDelay)
 import Control.Exception.Base (bracket)
-import Control.Monad (void)
+import Control.Monad (forever, void)
 import Data.Configurator
 import Data.Maybe
 import Data.Text hiding (filter, map)
@@ -53,7 +53,7 @@ notifier o i = bracket acquire (uncurry release) (const block)
             removeWatch w
             closeConnection conn
           -- Blocks the main thread, watchers are separate threads
-          block = newEmptyMVar >>= takeMVar
+          block = forever (threadDelay 100000000000)
 
 handleStartup :: FilePath -> Connection -> Text -> IO ()
 handleStartup listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q . map (listenPath </>) . filter ((/= Just '.') . listToMaybe)
