@@ -1,3 +1,12 @@
+amqp-pathwatcher (0.1.5) UNRELEASED; urgency=low
+
+  [ Brian McKenna ]
+  * Don't use an MVar, GHC is too smart and finds a deadlock
+
+  [ brian@simpleenergy.com ]
+
+ -- brian@simpleenergy.com <brian@bs00.cornell.mgmt>  Wed, 02 Jul 2014 15:15:12 -0600
+
 amqp-pathwatcher (0.1.4) UNRELEASED; urgency=low
 
   [ Brian McKenna ]
