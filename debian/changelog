@@ -1,3 +1,13 @@
+amqp-pathwatcher (0.1.6) UNRELEASED; urgency=low
+
+  [ Brian McKenna ]
+  * Also listen to IN_MOVE_TO (i.e. MoveIn) events
+  * Add a stderr message when an event is handled
+
+  [ brian@simpleenergy.com ]
+
+ -- brian@simpleenergy.com <brian@bs00.cornell.mgmt>  Mon, 07 Jul 2014 11:48:36 -0600
+
 amqp-pathwatcher (0.1.5) UNRELEASED; urgency=low
 
   [ Brian McKenna ]
