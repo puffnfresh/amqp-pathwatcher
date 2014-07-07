@@ -46,7 +46,7 @@ notifier o i = bracket acquire (uncurry release) (const block)
 
             let q = queue o
             handleStartup listenPath conn q
-            w <- addWatch i [CloseWrite] listenPath $ handleEvent listenPath conn q
+            w <- addWatch i [CloseWrite, MoveIn] listenPath $ handleEvent listenPath conn q
 
             return (conn, w)
           release conn w = do
