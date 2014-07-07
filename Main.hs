@@ -13,6 +13,7 @@ import Options.Applicative
 import System.Directory
 import System.FilePath
 import System.INotify
+import System.IO
 import qualified Data.ByteString.Lazy.Char8 as BL
 
 data MainOpts = MainOpts
@@ -58,8 +59,16 @@ notifier o i = bracket acquire (uncurry release) (const block)
 handleStartup :: FilePath -> Connection -> Text -> IO ()
 handleStartup listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q . map (listenPath </>) . filter ((/= Just '.') . listToMaybe)
 
+eventFilePath :: Event -> Maybe FilePath
+eventFilePath (Closed _ f _) = f
+eventFilePath (MovedIn _ f _) = Just f
+eventFilePath _ = Nothing
+
 handleEvent :: FilePath -> Connection -> Text -> Event -> IO ()
-handleEvent listenPath conn q = maybe (return ()) (publishPaths conn q . ((:[]) . (listenPath </>))) . maybeFilePath
+handleEvent listenPath conn q event = do
+  hPutStr stderr "Got event: "
+  hPrint stderr event
+  maybe (return ()) (publishPaths conn q . ((:[]) . (listenPath </>))) $ eventFilePath event
 
 publishPaths :: Connection -> Text -> [FilePath] -> IO ()
 publishPaths conn q paths = do
