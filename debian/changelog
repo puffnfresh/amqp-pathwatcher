@@ -1,3 +1,12 @@
+amqp-pathwatcher (0.1.7) UNRELEASED; urgency=low
+
+  [ Brian McKenna ]
+  * Don't queue hidden files
+
+  [ brian@simpleenergy.com ]
+
+ -- brian@simpleenergy.com <brian@bs00.cornell.mgmt>  Wed, 06 Aug 2014 08:29:10 -0600
+
 amqp-pathwatcher (0.1.6) UNRELEASED; urgency=low
 
   [ Brian McKenna ]
