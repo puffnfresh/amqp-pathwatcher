@@ -4,7 +4,7 @@ module Main (main) where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception.Base (bracket)
-import Control.Monad (forever, void)
+import Control.Monad (MonadPlus, mfilter, forever, void)
 import Data.Configurator
 import Data.Maybe
 import Data.Text hiding (filter, map)
@@ -57,7 +57,7 @@ notifier o i = bracket acquire (uncurry release) (const block)
           block = forever (threadDelay 100000000000)
 
 handleStartup :: FilePath -> Connection -> Text -> IO ()
-handleStartup listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q . map (listenPath </>) . filter ((/= Just '.') . listToMaybe)
+handleStartup listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q . map (listenPath </>) . filterHidden
 
 eventFilePath :: Event -> Maybe FilePath
 eventFilePath (Closed _ f _) = f
@@ -68,7 +68,10 @@ handleEvent :: FilePath -> Connection -> Text -> Event -> IO ()
 handleEvent listenPath conn q event = do
   hPutStr stderr "Got event: "
   hPrint stderr event
-  maybe (return ()) (publishPaths conn q . ((:[]) . (listenPath </>))) $ eventFilePath event
+  maybe (return ()) (publishPaths conn q . ((:[]) . (listenPath </>))) . filterHidden $ eventFilePath event
+
+filterHidden :: MonadPlus m => m FilePath -> m FilePath
+filterHidden = mfilter (maybe False (/= '.') . listToMaybe)
 
 publishPaths :: Connection -> Text -> [FilePath] -> IO ()
 publishPaths conn q paths = do
