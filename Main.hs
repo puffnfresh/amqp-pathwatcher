@@ -40,14 +40,15 @@ notifier o i = bracket acquire (uncurry release) (const block)
     where acquire = do
             p <- load [Required $ conf o]
             listenPath <- require p "fileIngest.incomingPath"
+            relative <- lookupDefault False p "fileIngest.inotify.relative"
             host <- require p "amqp.connection.host"
             user <- require p "amqp.connection.username"
             pass <- require p "amqp.connection.password"
             conn <- openConnection host "/" user pass
 
             let q = queue o
-            handleStartup listenPath conn q
-            w <- addWatch i [CloseWrite, MoveIn] listenPath $ handleEvent listenPath conn q
+            handleStartup relative listenPath conn q
+            w <- addWatch i [CloseWrite, MoveIn] listenPath $ handleEvent relative listenPath conn q
 
             return (conn, w)
           release conn w = do
@@ -56,19 +57,25 @@ notifier o i = bracket acquire (uncurry release) (const block)
           -- Blocks the main thread, watchers are separate threads
           block = forever (threadDelay 100000000000)
 
-handleStartup :: FilePath -> Connection -> Text -> IO ()
-handleStartup listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q . map (listenPath </>) . filterHidden
+type Relativize = Bool
+type Prefix = FilePath
+
+modifyPath :: Relativize -> Prefix -> FilePath -> FilePath
+modifyPath r = if not r then (</>) else const id
+
+handleStartup :: Relativize -> FilePath -> Connection -> Text -> IO ()
+handleStartup r listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q . map (modifyPath r listenPath) . filterHidden
 
 eventFilePath :: Event -> Maybe FilePath
 eventFilePath (Closed _ f _) = f
 eventFilePath (MovedIn _ f _) = Just f
 eventFilePath _ = Nothing
 
-handleEvent :: FilePath -> Connection -> Text -> Event -> IO ()
-handleEvent listenPath conn q event = do
+handleEvent :: Relativize -> FilePath -> Connection -> Text -> Event -> IO ()
+handleEvent r listenPath conn q event = do
   hPutStr stderr "Got event: "
   hPrint stderr event
-  maybe (return ()) (publishPaths conn q . ((:[]) . (listenPath </>))) . filterHidden $ eventFilePath event
+  maybe (return ()) (publishPaths conn q . ((:[]) . (modifyPath r listenPath))) . filterHidden $ eventFilePath event
 
 filterHidden :: MonadPlus m => m FilePath -> m FilePath
 filterHidden = mfilter (maybe False (/= '.') . listToMaybe)
