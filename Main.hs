@@ -56,13 +56,13 @@ notifier o i = do
       release conn w = do
         removeWatch w
         closeConnection conn
-      dailyStartup conn w = do
-        handleStartup relative listenPath conn q
+      queueAndBlock conn w = do
+        queueListenPath relative listenPath conn q
         -- Blocks the main thread, watchers are separate threads
         _ <- forever $ threadDelay delayMicros
-        dailyStartup conn w
+        queueAndBlock conn w
 
-  bracket acquire (uncurry release) (uncurry dailyStartup)
+  bracket acquire (uncurry release) (uncurry queueAndBlock)
 
 type Relativize = Bool
 type Prefix = FilePath
@@ -70,8 +70,8 @@ type Prefix = FilePath
 modifyPath :: Relativize -> Prefix -> FilePath -> FilePath
 modifyPath r = if not r then (</>) else const id
 
-handleStartup :: Relativize -> FilePath -> Connection -> Text -> IO ()
-handleStartup r listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q . map (modifyPath r listenPath) . filterHidden
+queueListenPath :: Relativize -> FilePath -> Connection -> Text -> IO ()
+queueListenPath r listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q . map (modifyPath r listenPath) . filterHidden
 
 eventFilePath :: Event -> Maybe FilePath
 eventFilePath (Closed _ f _) = f
