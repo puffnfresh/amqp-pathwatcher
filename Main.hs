@@ -35,17 +35,20 @@ opts = info (longHelp <*> mainOpts) $ fullDesc <> progDesc "Dump close_write ino
 main :: IO ()
 main = execParser opts >>= withINotify . notifier
 
+microsFromHours :: Int -> Int
+microsFromHours = (60 * 60 * 1000 * 1000 *)
+
 notifier :: MainOpts -> INotify -> IO ()
 notifier o i = do
   p <- load [Required $ conf o]
   listenPath <- require p "fileIngest.incomingPath"
+  delayMicros <- microsFromHours <$> lookupDefault 12 p "fileIngest.delayedRequeueHours"
   relative <- lookupDefault False p "fileIngest.inotify.relative"
   host <- require p "amqp.connection.host"
   user <- require p "amqp.connection.username"
   pass <- require p "amqp.connection.password"
 
   let q = queue o
-      dayMicros = 24 * 60 * 60 * 1000 * 1000
       acquire = do
         conn <- openConnection host "/" user pass
         w <- addWatch i [CloseWrite, MoveIn] listenPath $ handleEvent relative listenPath conn q
@@ -56,7 +59,7 @@ notifier o i = do
       dailyStartup conn w = do
         handleStartup relative listenPath conn q
         -- Blocks the main thread, watchers are separate threads
-        _ <- forever $ threadDelay dayMicros
+        _ <- forever $ threadDelay delayMicros
         dailyStartup conn w
 
   bracket acquire (uncurry release) (uncurry dailyStartup)
