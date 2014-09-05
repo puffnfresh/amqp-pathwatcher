@@ -36,26 +36,30 @@ main :: IO ()
 main = execParser opts >>= withINotify . notifier
 
 notifier :: MainOpts -> INotify -> IO ()
-notifier o i = bracket acquire (uncurry release) (const block)
-    where acquire = do
-            p <- load [Required $ conf o]
-            listenPath <- require p "fileIngest.incomingPath"
-            relative <- lookupDefault False p "fileIngest.inotify.relative"
-            host <- require p "amqp.connection.host"
-            user <- require p "amqp.connection.username"
-            pass <- require p "amqp.connection.password"
-            conn <- openConnection host "/" user pass
+notifier o i = do
+  p <- load [Required $ conf o]
+  listenPath <- require p "fileIngest.incomingPath"
+  relative <- lookupDefault False p "fileIngest.inotify.relative"
+  host <- require p "amqp.connection.host"
+  user <- require p "amqp.connection.username"
+  pass <- require p "amqp.connection.password"
 
-            let q = queue o
-            handleStartup relative listenPath conn q
-            w <- addWatch i [CloseWrite, MoveIn] listenPath $ handleEvent relative listenPath conn q
+  let q = queue o
+      dayMicros = 24 * 60 * 60 * 1000 * 1000
+      acquire = do
+        conn <- openConnection host "/" user pass
+        w <- addWatch i [CloseWrite, MoveIn] listenPath $ handleEvent relative listenPath conn q
+        return (conn, w)
+      release conn w = do
+        removeWatch w
+        closeConnection conn
+      dailyStartup conn w = do
+        handleStartup relative listenPath conn q
+        -- Blocks the main thread, watchers are separate threads
+        _ <- forever $ threadDelay dayMicros
+        dailyStartup conn w
 
-            return (conn, w)
-          release conn w = do
-            removeWatch w
-            closeConnection conn
-          -- Blocks the main thread, watchers are separate threads
-          block = forever (threadDelay 100000000000)
+  bracket acquire (uncurry release) (uncurry dailyStartup)
 
 type Relativize = Bool
 type Prefix = FilePath
