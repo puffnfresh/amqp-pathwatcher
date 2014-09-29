@@ -14,6 +14,7 @@ import System.Directory
 import System.FilePath
 import System.INotify hiding (isDirectory)
 import System.IO
+import System.Remote.Monitoring (forkServer)
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified System.Posix.Files as F
 
@@ -34,7 +35,7 @@ opts :: ParserInfo MainOpts
 opts = info (longHelp <*> mainOpts) $ fullDesc <> progDesc "Dump close_write inotify events onto an AMQP queue."
 
 main :: IO ()
-main = execParser opts >>= withINotify . notifier
+main = forkServer "0.0.0.0" 8354 >> execParser opts >>= withINotify . notifier
 
 microsFromHours :: Int -> Int
 microsFromHours = (60 * 60 * 1000 * 1000 *)
