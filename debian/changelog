@@ -1,3 +1,13 @@
+amqp-pathwatcher (0.1.11) UNRELEASED; urgency=low
+
+  [ Brian McKenna ]
+  * Listen recursively to directories
+  * Add ekg monitoring
+
+  [ brian@simpleenergy.com ]
+
+ -- brian@simpleenergy.com <brian@bs00.cornell.mgmt>  Mon, 29 Sep 2014 16:00:07 -0600
+
 amqp-pathwatcher (0.1.10) UNRELEASED; urgency=low
 
   [ Brian McKenna ]
