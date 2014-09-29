@@ -4,7 +4,7 @@ module Main (main) where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception.Base (bracket)
-import Control.Monad (MonadPlus, mfilter, forever, void)
+import Control.Monad (MonadPlus, filterM, forever, join, mfilter, void)
 import Data.Configurator
 import Data.Maybe
 import Data.Text hiding (filter, map)
@@ -12,9 +12,10 @@ import Network.AMQP
 import Options.Applicative
 import System.Directory
 import System.FilePath
-import System.INotify
+import System.INotify hiding (isDirectory)
 import System.IO
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified System.Posix.Files as F
 
 data MainOpts = MainOpts
     { conf :: FilePath
@@ -23,7 +24,7 @@ data MainOpts = MainOpts
 
 mainOpts :: Parser MainOpts
 mainOpts = MainOpts
-           <$> (strOption $ short 'c' <> metavar "CONFIG" <> help "Configuration file")
+           <$> strOption (short 'c' <> metavar "CONFIG" <> help "Configuration file")
            <*> fmap pack (argument str $ metavar "QUEUE" <> help "AMQP queue name")
 
 longHelp :: Parser (a -> a)
@@ -38,6 +39,25 @@ main = execParser opts >>= withINotify . notifier
 microsFromHours :: Int -> Int
 microsFromHours = (60 * 60 * 1000 * 1000 *)
 
+isDirectory :: FilePath -> IO Bool
+isDirectory = fmap F.isDirectory . F.getFileStatus
+
+isRegularFile :: FilePath -> IO Bool
+isRegularFile = fmap F.isRegularFile . F.getFileStatus
+
+toAbsolute :: (Functor m, MonadPlus m) => FilePath -> m FilePath -> m FilePath
+toAbsolute path = fmap (path </>) . filterHidden
+
+absoluteContents :: FilePath -> IO [FilePath]
+absoluteContents path = toAbsolute path <$> getDirectoryContents path
+
+recursiveDirectories :: FilePath -> IO [FilePath]
+recursiveDirectories path = do
+  contents <- absoluteContents path
+  directories <- filterM isDirectory contents
+  rest <- mapM recursiveDirectories directories
+  return (path:join rest)
+
 notifier :: MainOpts -> INotify -> IO ()
 notifier o i = do
   p <- load [Required $ conf o]
@@ -50,39 +70,43 @@ notifier o i = do
 
   let q = queue o
       acquire = do
+        toWatch <- recursiveDirectories listenPath
         conn <- openConnection host "/" user pass
-        w <- addWatch i [CloseWrite, MoveIn] listenPath $ handleEvent relative listenPath conn q
-        return (conn, w)
-      release conn w = do
-        removeWatch w
+        ws <- mapM (\d -> addWatch i [CloseWrite, MoveIn] d (handleEvent relative listenPath d conn q)) toWatch
+        return (conn, toWatch, ws)
+      release conn _ ws = do
+        mapM_ removeWatch ws
         closeConnection conn
-      queueAndBlock conn w = do
-        queueListenPath relative listenPath conn q
+      queueAndBlock conn dirs ws = do
+        mapM_ (\d -> queueContents relative listenPath d conn q) dirs
         -- Blocks the main thread, watchers are separate threads
-        _ <- forever $ threadDelay delayMicros
-        queueAndBlock conn w
+        void . forever $ threadDelay delayMicros
+        queueAndBlock conn dirs ws
 
-  bracket acquire (uncurry release) (uncurry queueAndBlock)
+  bracket acquire (\(a, b, c) -> release a b c) (\(a, b, c) -> queueAndBlock a b c)
 
 type Relativize = Bool
 type Prefix = FilePath
 
 modifyPath :: Relativize -> Prefix -> FilePath -> FilePath
-modifyPath r = if not r then (</>) else const id
+modifyPath r = if r then makeRelative else const id
 
-queueListenPath :: Relativize -> FilePath -> Connection -> Text -> IO ()
-queueListenPath r listenPath conn q = getDirectoryContents listenPath >>= publishPaths conn q . map (modifyPath r listenPath) . filterHidden
+queueContents :: Relativize -> FilePath -> FilePath -> Connection -> Text -> IO ()
+queueContents r listenPath path conn q =
+  absoluteContents path >>=
+  filterM isRegularFile >>=
+  publishPaths conn q . fmap (modifyPath r listenPath)
 
 eventFilePath :: Event -> Maybe FilePath
 eventFilePath (Closed _ f _) = f
 eventFilePath (MovedIn _ f _) = Just f
 eventFilePath _ = Nothing
 
-handleEvent :: Relativize -> FilePath -> Connection -> Text -> Event -> IO ()
-handleEvent r listenPath conn q event = do
+handleEvent :: Relativize -> FilePath -> FilePath -> Connection -> Text -> Event -> IO ()
+handleEvent r listenPath path conn q event = do
   hPutStr stderr "Got event: "
   hPrint stderr event
-  maybe (return ()) (publishPaths conn q . ((:[]) . (modifyPath r listenPath))) . filterHidden $ eventFilePath event
+  maybe (return ()) (publishPaths conn q . (:[]) . modifyPath r listenPath) . toAbsolute path $ eventFilePath event
 
 filterHidden :: MonadPlus m => m FilePath -> m FilePath
 filterHidden = mfilter (maybe False (/= '.') . listToMaybe)
