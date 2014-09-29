@@ -17,6 +17,8 @@ executable amqp-pathwatcher
                      , configurator >=0.2.0.2 && <0.3
                      , hinotify >=0.3.7 && <0.4
                      , optparse-applicative >=0.9.0 && <0.10
+                     , ekg >= 0.3 && < 0.4
+                     , clock < 0.4.1
                      , bytestring
                      , directory
                      , filepath
