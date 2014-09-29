@@ -37,5 +37,5 @@ script
 
 echo "Using base dir ${BASEDIR:=/usr/local/datintel}"
 
-exec ${BASEDIR}/bin/amqp-pathwatcher -c $CONFIG $QUEUE
+exec ${BASEDIR}/bin/amqp-pathwatcher -c $CONFIG $QUEUE +RTS -T -RTS
 end script
