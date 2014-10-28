@@ -68,11 +68,12 @@ notifier o i = do
   host <- require p "amqp.connection.host"
   user <- require p "amqp.connection.username"
   pass <- require p "amqp.connection.password"
+  vhost <- lookupDefault "/" p "amqp.connection.virtualHost"
 
   let q = queue o
       acquire = do
         toWatch <- recursiveDirectories listenPath
-        conn <- openConnection host "/" user pass
+        conn <- openConnection host vhost user pass
         ws <- mapM (\d -> addWatch i [CloseWrite, MoveIn] d (handleEvent relative listenPath d conn q)) toWatch
         return (conn, toWatch, ws)
       release conn _ ws = do
