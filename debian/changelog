@@ -1,3 +1,15 @@
+amqp-pathwatcher (0.1.12) UNRELEASED; urgency=low
+
+  [ Brian McKenna ]
+  * Run with RTS opts to make ekg more useful
+  * Allow virtualhost to be set in config
+  * Expand upper dependency bounds
+  * nix build files
+
+  [ brian@simpleenergy.com ]
+
+ -- brian@simpleenergy.com <brian@bs00.cornell.mgmt>  Fri, 31 Oct 2014 10:37:28 -0600
+
 amqp-pathwatcher (0.1.11) UNRELEASED; urgency=low
 
   [ Brian McKenna ]
