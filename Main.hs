@@ -116,7 +116,7 @@ filterHidden = mfilter (maybe False (/= '.') . listToMaybe)
 publishPaths :: Connection -> Text -> [FilePath] -> IO ()
 publishPaths conn q paths = do
   chan <- openChannel conn
-
+  addReturnListener chan (hPutStr stderr . ("Response: " ++) . show)
   void $ declareQueue chan newQueue { queueName = q }
   mapM_ (publish chan) paths
   closeChannel chan
