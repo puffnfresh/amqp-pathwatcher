@@ -74,6 +74,7 @@ notifier o i = do
       acquire = do
         toWatch <- recursiveDirectories listenPath
         conn <- openConnection host vhost user pass
+        addConnectionClosedHandler conn True (hPutStr stderr "AMQP connection closed")
         ws <- mapM (\d -> addWatch i [CloseWrite, MoveIn] d (handleEvent relative listenPath d conn q)) toWatch
         return (conn, toWatch, ws)
       release conn _ ws = do
