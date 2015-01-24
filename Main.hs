@@ -90,6 +90,7 @@ notifier o i = do
         ws <- mapM (\d -> addWatch i [CloseWrite, MoveIn] d (handleEvent relative listenPath d conn q)) toWatch
         return (conn, toWatch, ws)
       release conn _ ws = do
+        noticeM "amqp-pathwatcher" $ "Hit delay of " ++ show delayMicros ++ "- closing handles"
         mapM_ removeWatch ws
         closeConnection conn
       queueAndBlock conn dirs = do
