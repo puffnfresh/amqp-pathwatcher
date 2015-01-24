@@ -2,24 +2,25 @@
 
 module Main (main) where
 
-import Control.Concurrent (threadDelay)
-import Control.Exception.Base (bracket)
-import Control.Monad (MonadPlus, filterM, forever, join, mfilter, void)
-import Data.Configurator
-import Data.Maybe
-import Data.Text hiding (filter, map)
-import Network.AMQP
-import Options.Applicative
-import System.Directory
-import System.FilePath
-import System.INotify hiding (isDirectory)
-import System.IO
-import System.Remote.Monitoring (forkServer)
+import           Control.Concurrent         (threadDelay)
+import           Control.Exception.Base     (bracket)
+import           Control.Monad              (MonadPlus, filterM, forever, join,
+                                             mfilter, void)
 import qualified Data.ByteString.Lazy.Char8 as BL
-import qualified System.Posix.Files as F
+import           Data.Configurator
+import           Data.Maybe
+import           Data.Text                  hiding (filter, map)
+import           Network.AMQP
+import           Options.Applicative
+import           System.Directory
+import           System.FilePath
+import           System.INotify             hiding (isDirectory)
+import           System.IO
+import qualified System.Posix.Files         as F
+import           System.Remote.Monitoring   (forkServer)
 
 data MainOpts = MainOpts
-    { conf :: FilePath
+    { conf  :: FilePath
     , queue :: Text
     }
 
