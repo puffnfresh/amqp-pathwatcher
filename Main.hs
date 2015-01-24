@@ -16,6 +16,10 @@ import           System.Directory
 import           System.FilePath
 import           System.INotify             hiding (isDirectory)
 import           System.IO
+import           System.Log.Formatter       (simpleLogFormatter)
+import           System.Log.Handler         (setFormatter)
+import           System.Log.Handler.Simple  (streamHandler)
+import           System.Log.Logger
 import qualified System.Posix.Files         as F
 import           System.Remote.Monitoring   (forkServer)
 
@@ -71,11 +75,16 @@ notifier o i = do
   pass <- require p "amqp.connection.password"
   vhost <- lookupDefault "/" p "amqp.connection.virtualHost"
 
+  logHandler <- streamHandler stderr DEBUG
+  let formatHandler' = setFormatter logHandler $ simpleLogFormatter "$time [$prio] $loggername - $msg"
+  updateGlobalLogger rootLoggerName removeHandler
+  updateGlobalLogger "amqp-pathwatcher" (setLevel DEBUG . setHandlers [formatHandler'])
+
   let q = queue o
       acquire = do
         toWatch <- recursiveDirectories listenPath
         conn <- openConnection host vhost user pass
-        addConnectionClosedHandler conn True (hPutStr stderr "AMQP connection closed")
+        addConnectionClosedHandler conn True (warningM "amqp-pathwatcher" "AMQP connection closed")
         ws <- mapM (\d -> addWatch i [CloseWrite, MoveIn] d (handleEvent relative listenPath d conn q)) toWatch
         return (conn, toWatch, ws)
       release conn _ ws = do
@@ -108,8 +117,7 @@ eventFilePath _ = Nothing
 
 handleEvent :: Relativize -> FilePath -> FilePath -> Connection -> Text -> Event -> IO ()
 handleEvent r listenPath path conn q event = do
-  hPutStr stderr "Got event: "
-  hPrint stderr event
+  infoM "amqp-pathwatcher" $ "Got event: " ++ show event
   maybe (return ()) (publishPaths conn q . (:[]) . modifyPath r listenPath) . toAbsolute path $ eventFilePath event
 
 filterHidden :: MonadPlus m => m FilePath -> m FilePath
@@ -118,7 +126,7 @@ filterHidden = mfilter (maybe False (/= '.') . listToMaybe)
 publishPaths :: Connection -> Text -> [FilePath] -> IO ()
 publishPaths conn q paths = do
   chan <- openChannel conn
-  addReturnListener chan (hPutStr stderr . ("Response: " ++) . show)
+  addReturnListener chan (infoM "amqp-pathwatcher" . ("Response: " ++) . show)
   void $ declareQueue chan newQueue { queueName = q }
   mapM_ (publish chan) paths
   closeChannel chan
