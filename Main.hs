@@ -82,7 +82,7 @@ notifier o i = do
 
   let q = queue o
       acquire = do
-        infoM "amqp-pathwatcher" $ "Openning connection to " ++ host ++ " on vhost " ++ unpack vhost
+        infoM "amqp-pathwatcher" $ "Opening connection to " ++ host ++ " on vhost " ++ unpack vhost
         conn <- openConnection host vhost user pass
         infoM "amqp-pathwatcher" $ "Adding watchers to " ++ listenPath
         toWatch <- recursiveDirectories listenPath
