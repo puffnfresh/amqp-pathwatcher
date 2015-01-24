@@ -93,6 +93,7 @@ notifier o i = do
         mapM_ removeWatch ws
         closeConnection conn
       queueAndBlock conn dirs = do
+        infoM "amqp-pathwatcher" $ "Doing an initial queueing of all files in " ++ listenPath
         mapM_ (\d -> queueContents relative listenPath d conn q) dirs
         -- Blocks the main thread, watchers are separate threads
         threadDelay delayMicros
