@@ -82,7 +82,9 @@ notifier o i = do
 
   let q = queue o
       acquire = do
+        infoM "amqp-pathwatcher" $ "Adding watcher to " ++ listenPath
         toWatch <- recursiveDirectories listenPath
+        infoM "amqp-pathwatcher" $ "Openning connection to " ++ host ++ " on vhost " ++ unpack vhost
         conn <- openConnection host vhost user pass
         addConnectionClosedHandler conn True (warningM "amqp-pathwatcher" "AMQP connection closed")
         ws <- mapM (\d -> addWatch i [CloseWrite, MoveIn] d (handleEvent relative listenPath d conn q)) toWatch
