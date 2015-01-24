@@ -79,13 +79,13 @@ notifier o i = do
       release conn _ ws = do
         mapM_ removeWatch ws
         closeConnection conn
-      queueAndBlock conn dirs ws = do
+      queueAndBlock conn dirs = do
         mapM_ (\d -> queueContents relative listenPath d conn q) dirs
         -- Blocks the main thread, watchers are separate threads
-        void . forever $ threadDelay delayMicros
-        queueAndBlock conn dirs ws
+        threadDelay delayMicros
 
-  bracket acquire (\(a, b, c) -> release a b c) (\(a, b, c) -> queueAndBlock a b c)
+  -- Open a new connection to AMQP and a new inotify handle every delayedRequeueHours
+  forever $ bracket acquire (\(a, b, c) -> release a b c) (\(a, b, _) -> queueAndBlock a b)
 
 type Relativize = Bool
 type Prefix = FilePath
