@@ -118,8 +118,8 @@ publishPaths conn q paths = do
   chan <- openChannel conn
 
   void $ declareQueue chan newQueue { queueName = q }
-
   mapM_ (publish chan) paths
+  closeChannel chan
   where publish :: Channel -> FilePath -> IO ()
         publish chan p = publishMsg chan "" q newMsg { msgBody = BL.pack p
                                                      , msgDeliveryMode = Just Persistent }
