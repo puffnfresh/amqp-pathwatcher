@@ -2,24 +2,29 @@
 
 module Main (main) where
 
-import Control.Concurrent (threadDelay)
-import Control.Exception.Base (bracket)
-import Control.Monad (MonadPlus, filterM, forever, join, mfilter, void)
-import Data.Configurator
-import Data.Maybe
-import Data.Text hiding (filter, map)
-import Network.AMQP
-import Options.Applicative
-import System.Directory
-import System.FilePath
-import System.INotify hiding (isDirectory)
-import System.IO
-import System.Remote.Monitoring (forkServer)
+import           Control.Concurrent         (threadDelay)
+import           Control.Exception.Base     (bracket)
+import           Control.Monad              (MonadPlus, filterM, forever, join,
+                                             mfilter, void)
 import qualified Data.ByteString.Lazy.Char8 as BL
-import qualified System.Posix.Files as F
+import           Data.Configurator
+import           Data.Maybe
+import           Data.Text                  hiding (filter, map)
+import           Network.AMQP
+import           Options.Applicative
+import           System.Directory
+import           System.FilePath
+import           System.INotify             hiding (isDirectory)
+import           System.IO
+import           System.Log.Formatter       (simpleLogFormatter)
+import           System.Log.Handler         (setFormatter)
+import           System.Log.Handler.Simple  (streamHandler)
+import           System.Log.Logger
+import qualified System.Posix.Files         as F
+import           System.Remote.Monitoring   (forkServer)
 
 data MainOpts = MainOpts
-    { conf :: FilePath
+    { conf  :: FilePath
     , queue :: Text
     }
 
@@ -70,22 +75,32 @@ notifier o i = do
   pass <- require p "amqp.connection.password"
   vhost <- lookupDefault "/" p "amqp.connection.virtualHost"
 
+  logHandler <- streamHandler stderr DEBUG
+  let formatHandler' = setFormatter logHandler $ simpleLogFormatter "$time [$prio] $loggername - $msg"
+  updateGlobalLogger rootLoggerName removeHandler
+  updateGlobalLogger "amqp-pathwatcher" (setLevel DEBUG . setHandlers [formatHandler'])
+
   let q = queue o
       acquire = do
-        toWatch <- recursiveDirectories listenPath
+        infoM "amqp-pathwatcher" $ "Opening connection to " ++ host ++ " on vhost " ++ unpack vhost
         conn <- openConnection host vhost user pass
+        infoM "amqp-pathwatcher" $ "Adding watchers to " ++ listenPath
+        toWatch <- recursiveDirectories listenPath
+        addConnectionClosedHandler conn True (warningM "amqp-pathwatcher" "AMQP connection closed")
         ws <- mapM (\d -> addWatch i [CloseWrite, MoveIn] d (handleEvent relative listenPath d conn q)) toWatch
         return (conn, toWatch, ws)
       release conn _ ws = do
+        noticeM "amqp-pathwatcher" $ "Hit delay of " ++ show delayMicros ++ "- closing handles"
         mapM_ removeWatch ws
         closeConnection conn
-      queueAndBlock conn dirs ws = do
+      queueAndBlock conn dirs = do
+        infoM "amqp-pathwatcher" $ "Doing an initial queueing of all files in " ++ listenPath
         mapM_ (\d -> queueContents relative listenPath d conn q) dirs
         -- Blocks the main thread, watchers are separate threads
-        void . forever $ threadDelay delayMicros
-        queueAndBlock conn dirs ws
+        threadDelay delayMicros
 
-  bracket acquire (\(a, b, c) -> release a b c) (\(a, b, c) -> queueAndBlock a b c)
+  -- Open a new connection to AMQP and a new inotify handle every delayedRequeueHours
+  forever $ bracket acquire (\(a, b, c) -> release a b c) (\(a, b, _) -> queueAndBlock a b)
 
 type Relativize = Bool
 type Prefix = FilePath
@@ -106,8 +121,7 @@ eventFilePath _ = Nothing
 
 handleEvent :: Relativize -> FilePath -> FilePath -> Connection -> Text -> Event -> IO ()
 handleEvent r listenPath path conn q event = do
-  hPutStr stderr "Got event: "
-  hPrint stderr event
+  infoM "amqp-pathwatcher" $ "Got event: " ++ show event
   maybe (return ()) (publishPaths conn q . (:[]) . modifyPath r listenPath) . toAbsolute path $ eventFilePath event
 
 filterHidden :: MonadPlus m => m FilePath -> m FilePath
@@ -116,10 +130,10 @@ filterHidden = mfilter (maybe False (/= '.') . listToMaybe)
 publishPaths :: Connection -> Text -> [FilePath] -> IO ()
 publishPaths conn q paths = do
   chan <- openChannel conn
-
+  addReturnListener chan (infoM "amqp-pathwatcher" . ("Response: " ++) . show)
   void $ declareQueue chan newQueue { queueName = q }
-
   mapM_ (publish chan) paths
+  closeChannel chan
   where publish :: Channel -> FilePath -> IO ()
         publish chan p = publishMsg chan "" q newMsg { msgBody = BL.pack p
                                                      , msgDeliveryMode = Just Persistent }
