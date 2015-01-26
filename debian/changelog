@@ -1,3 +1,24 @@
+amqp-pathwatcher (0.1.13) UNRELEASED; urgency=low
+
+  [ Brian McKenna ]
+  * configurator + optparse-applicative are in nixpkgs
+  * Close open channels explicitly
+  * Print responses from a channel
+  * Periodically refresh AMQP and inotify handles
+  * Print when the AMQP connection is closed
+  * Reformat using stylish-haskell
+  * Use hslogger for real logging
+  * Add log messages for acquire
+  * Fix order of log messages for acquire
+  * Log when doing an initial queue
+  * Log when closing handles
+  * Fix typo s/Openning/Opening/
+  * Reconnect to AMQP after a disconnect
+
+  [ brian@simpleenergy.com ]
+
+ -- brian@simpleenergy.com <brian@bs00.cornell.mgmt>  Mon, 26 Jan 2015 11:15:42 -0700
+
 amqp-pathwatcher (0.1.12) UNRELEASED; urgency=low
 
   [ Brian McKenna ]
